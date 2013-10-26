@@ -14,47 +14,67 @@
 #include <CapacitiveSensor.h>
 #include "config.h"
 
+#define SAMPLE_COUNT         1 // how many readings do we sum to determine the sensor value
+#define TRIGGER_THRESHOLD   20 // what reading triggers the pin to be on
+
+
 // Using an array of pointers soas to not have to keep editing 
-// the code when we want to change pin counts.
+// the code when we want to change pin counts - CapacitiveSensor doesn't
+// have a default constructor.
 CapacitiveSensor *pins[MAX_PIN_COUNT];
-char pinState[MAX_PIN_COUNT+1]; // +1 for null terminator
+long pinReadings[MAX_PIN_COUNT];
+char pinStates[MAX_PIN_COUNT+1]; // +1 for null terminator
+CapacitiveSensor currentPin = CapacitiveSensor(1,2);
 
 void setup() {
   //start serial connection
   Serial.begin(9600);
 
-  // TODO: initialze using values read from Serial
   for (int i=0; i<PIN_COUNT; i++) {    
-    CapacitiveSensor currentPin =  CapacitiveSensor(COMMON_PIN,START_PIN+0);
+    currentPin =  CapacitiveSensor(COMMON_PIN,START_PIN+i);
     currentPin.set_CS_AutocaL_Millis(0xFFFFFFFF);  // turn off auto-calibrate
     pins[i] = &currentPin;  // pins is an array of pointers
-    pinState[i] = '0'; // start all pins in 'off' state
+    pinReadings[i] = 0; // start all readings as 0
+    pinStates[i] = '0'; // start all pins in 'off' state
   }
 
   // Last character in our state array should be a null as we will
   // ultimately "print" it to serial output; this will effectively 
-  // 'truncate' the pinState array to the actual number of keys
-  // rather than the max number of keys.
-  pinState[PIN_COUNT] = 0;
+  // 'truncate' the pinState array to the actual number of pins
+  // rather than the max number of pins.
+  pinStates[PIN_COUNT] = 0;
+
+  // This is "loop()", but in setup() so that we don't de-reference
+  // our objects
+  while (true) {
+  
+    // Sweep quickly through the pins to capture the readings
+    for (int i=0; i<PIN_COUNT; i++) {
+//      pinReadings[i] = max(0,pins[i]->capacitiveSensor(SAMPLE_COUNT));
+      pinReadings[i] = pins[i]->capacitiveSensor(SAMPLE_COUNT);
+    }
+  
+    for (int i=0; i<PIN_COUNT; i++) {
+      if (pinReadings[i] > TRIGGER_THRESHOLD)
+        pinStates[i] = '1';
+      else
+        pinStates[i] = '0'; 
+    }
+  
+    Serial.print(pinStates);
+    for (int i=0; i<PIN_COUNT; i++) {
+      Serial.print(",");
+      Serial.print(pinReadings[i]);
+    }    
+    Serial.println();
+    
+    delay(100);
+  }
   
 }
 
-#define TRIGGER_THRESHOLD  150 // what reading triggers the note to play
-#define SAMPLE_COUNT        10 // how many triggered readings do we take before deciding the note should play
-long sensorReading;
-
 void loop(){
-
-  for (int i=0; i<PIN_COUNT; i++) {
-    sensorReading = pins[i]->capacitiveSensor(SAMPLE_COUNT);
-    if (sensorReading > TRIGGER_THRESHOLD)
-      pinState[i] = '1';
-    else
-      pinState[i] = '0'; 
-  }
-
-  Serial.println(pinState);
-  delay(100);
+  // loop will never be reached
 }
 
 
